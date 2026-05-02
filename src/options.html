@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JLPT Helper Options</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+      body {
+        background: #f8fafc;
+        color: #0f172a;
+        margin: 0;
+      }
+      .jt4y-helper__options {
+        margin: 0 auto;
+        max-width: 720px;
+        padding: 28px 18px;
+      }
+      .option-row {
+        align-items: center;
+        background: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        display: flex;
+        gap: 12px;
+        justify-content: space-between;
+        margin: 12px 0;
+        padding: 14px;
+      }
+      .option-row label {
+        font-weight: 700;
+      }
+      .option-row span {
+        color: #475569;
+        display: block;
+        font-size: 13px;
+        font-weight: 400;
+        margin-top: 4px;
+      }
+      select {
+        min-height: 34px;
+      }
+      #status {
+        color: #166534;
+        min-height: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="jt4y-helper jt4y-helper__options">
+      <h1>JLPT Helper Options</h1>
+      <form id="options-form">
+        <div class="option-row">
+          <label for="hideAnswerKeyByDefault">
+            Hide answer key by default
+            <span>Prevents accidental spoilers when a compatible page loads.</span>
+          </label>
+          <input id="hideAnswerKeyByDefault" name="hideAnswerKeyByDefault" type="checkbox">
+        </div>
+        <div class="option-row">
+          <label for="theme">
+            Theme
+            <span>Controls the extension UI only.</span>
+          </label>
+          <select id="theme" name="theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </div>
+        <div class="option-row">
+          <label for="gptFeatureEnabled">
+            Enable GPT mistake helper
+            <span>Disabled by default. The content script still asks before any external sharing.</span>
+          </label>
+          <input id="gptFeatureEnabled" name="gptFeatureEnabled" type="checkbox">
+        </div>
+        <button type="submit">Save options</button>
+        <p id="status" role="status"></p>
+      </form>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
