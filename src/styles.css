@@ -3,6 +3,12 @@
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.jt4y-helper *,
+.jt4y-helper *::before,
+.jt4y-helper *::after {
+  box-sizing: border-box;
+}
+
 .jt4y-helper__choice {
   align-items: center;
   border: 1px solid transparent;
@@ -303,6 +309,108 @@
 .jt4y-helper__focus-pulse {
   outline: 3px solid #f59e0b;
   outline-offset: 4px;
+}
+
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__choice-number {
+  background: #1f2937;
+  color: #bfdbfe;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .jt4y-helper__choice {
+  color: #e5e7eb;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .jt4y-helper--selected {
+  background: #172554;
+  border-color: #3b82f6;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .jt4y-helper--correct {
+  background: #14532d !important;
+  border-color: #22c55e !important;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .jt4y-helper--wrong {
+  background: #7f1d1d !important;
+  border-color: #ef4444 !important;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .jt4y-helper--unanswered {
+  background: #374151 !important;
+  border-color: #9ca3af !important;
+}
+
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__toolbar,
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__review,
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__anki-popup,
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__answer-key-placeholder {
+  background: #111827;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__metrics,
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__anki-status {
+  color: #d1d5db;
+}
+
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__toolbar-head button {
+  background: #374151;
+  color: #f9fafb;
+}
+
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__notes textarea,
+html[data-jt4y-helper-theme="dark"] .jt4y-helper__anki-controls select {
+  background: #0f172a;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] body,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] #page,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] #content,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .content,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .entry,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] .post,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] article,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] main {
+  background: #0f172a !important;
+  color: #e5e7eb !important;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] p,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] h1,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] h2,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] h3,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] li,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] label {
+  color: #e5e7eb !important;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] a {
+  color: #93c5fd !important;
+}
+
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] input,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] select,
+html[data-jt4y-helper-theme="dark"][data-jt4y-helper-dark-scope="page"] textarea {
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-jt4y-helper-theme="system"] .jt4y-helper__toolbar,
+  html[data-jt4y-helper-theme="system"] .jt4y-helper__review,
+  html[data-jt4y-helper-theme="system"] .jt4y-helper__anki-popup,
+  html[data-jt4y-helper-theme="system"] .jt4y-helper__answer-key-placeholder {
+    background: #111827;
+    border-color: #4b5563;
+    color: #e5e7eb;
+  }
+
+  html[data-jt4y-helper-theme="system"] .jt4y-helper__metrics,
+  html[data-jt4y-helper-theme="system"] .jt4y-helper__anki-status {
+    color: #d1d5db;
+  }
 }
 
 @media (max-width: 640px) {

@@ -6,6 +6,7 @@
   const DEFAULT_PREFS = {
     hideAnswerKeyByDefault: true,
     theme: "system",
+    darkModeScope: "helper",
     toolbarCollapsed: false,
     gptFeatureEnabled: false,
     ankiEnabled: true,
@@ -414,6 +415,19 @@
 
   const setTheme = () => {
     document.documentElement.dataset.jt4yHelperTheme = state.prefs.theme || "system";
+    document.documentElement.dataset.jt4yHelperDarkScope = state.prefs.darkModeScope || "helper";
+  };
+
+  const initPreferenceListener = () => {
+    const storage = getChromeStorage();
+    if (!storage || !storage.onChanged) return;
+    storage.onChanged.addListener((changes, areaName) => {
+      if (areaName !== "sync") return;
+      Object.keys(DEFAULT_PREFS).forEach((key) => {
+        if (changes[key]) state.prefs[key] = changes[key].newValue;
+      });
+      if (changes.theme || changes.darkModeScope) setTheme();
+    });
   };
 
   function injectQuizControls(questions) {
@@ -756,6 +770,26 @@
     });
   };
 
+  const getDiagnostics = () => ({
+    compatible: document.documentElement.dataset.jt4yHelperInitialized === "true",
+    questionCount: state.questions.length,
+    answerKeyCount: state.answerKey && state.answerKey.answers ? state.answerKey.answers.size : 0,
+    nativeRadioCount: state.root ? state.root.querySelectorAll('input[type="radio"][name^="quest"]').length : 0,
+    answerKeyHidden: state.answerKeyHidden,
+    toolbarCollapsed: Boolean(state.prefs.toolbarCollapsed),
+    theme: state.prefs.theme || "system",
+    darkModeScope: state.prefs.darkModeScope || "helper"
+  });
+
+  const initRuntimeMessages = () => {
+    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.onMessage) return;
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (!message || message.type !== "getDiagnostics") return false;
+      sendResponse({ ok: true, diagnostics: getDiagnostics() });
+      return false;
+    });
+  };
+
   const injectToolbar = () => {
     if (document.querySelector(`#${EXT_NS}-toolbar`)) return;
     const toolbar = document.createElement("aside");
@@ -826,6 +860,8 @@
     const storedPrefs = await storageGet(Object.keys(DEFAULT_PREFS));
     state.prefs = { ...DEFAULT_PREFS, ...storedPrefs };
     setTheme();
+    initPreferenceListener();
+    initRuntimeMessages();
 
     const root = findSmallestCompatibleRoot();
     if (!root) {

@@ -21,6 +21,20 @@
         color: #475569;
         margin: 0 0 12px;
       }
+      .diagnostics {
+        border-top: 1px solid #cbd5e1;
+        display: grid;
+        gap: 6px;
+        margin-top: 12px;
+        padding-top: 12px;
+      }
+      .diagnostics div {
+        display: flex;
+        justify-content: space-between;
+      }
+      .diagnostics span {
+        color: #475569;
+      }
       .jt4y-helper__popup a {
         color: #1d4ed8;
       }
@@ -31,6 +45,13 @@
       <h1>JLPT Helper</h1>
       <p>Works on compatible Japanesetest4you practice pages with an Answer Key section.</p>
       <button id="open-options" type="button">Options</button>
+      <section class="diagnostics" id="diagnostics" aria-live="polite">
+        <div><strong>Page</strong><span id="diag-compatible">Checking...</span></div>
+        <div><strong>Questions</strong><span id="diag-questions">-</span></div>
+        <div><strong>Answer key</strong><span id="diag-answers">-</span></div>
+        <div><strong>Native radios</strong><span id="diag-radios">-</span></div>
+        <div><strong>Theme</strong><span id="diag-theme">-</span></div>
+      </section>
     </main>
     <script src="popup.js"></script>
   </body>

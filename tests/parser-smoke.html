@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>JLPT Helper Parser Smoke Fixtures</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+        margin: 24px;
+      }
+      .pass {
+        color: #166534;
+      }
+      .fail {
+        color: #991b1b;
+      }
+      pre {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Parser Smoke Fixtures</h1>
+    <p>This local page uses synthetic content only. It checks the parser assumptions without copying site data.</p>
+
+    <article id="fixture">
+      <p>1. Synthetic grammar question _______ .</p>
+      <p><input name="quest1" type="radio" value="1"> option one<br>
+      <input name="quest1" type="radio" value="2"> option two<br>
+      <input name="quest1" type="radio" value="3"> option three<br>
+      <input name="quest1" type="radio" value="4"> option four</p>
+
+      <p>2. A "I want to work now."<br>
+      B "How about learning _______?"</p>
+      <p><input name="quest2" type="radio" value="1"> choice one<br>
+      <input name="quest2" type="radio" value="2"> choice two<br>
+      <input name="quest2" type="radio" value="3"> choice three<br>
+      <input name="quest2" type="radio" value="4"> choice four</p>
+
+      <p><strong>Answer Key:</strong></p>
+      <p>Question 1: 2 (synthetic <mark>answer</mark>)<br>
+      Question 2: 4 (synthetic <mark>answer</mark>)</p>
+    </article>
+
+    <h2>Results</h2>
+    <pre id="results"></pre>
+
+    <script>
+      const normalize = (value) => String(value || "").replace(/\s+/g, " ").trim();
+      const fixture = document.getElementById("fixture");
+      const results = document.getElementById("results");
+
+      const answers = new Map(
+        Array.from(fixture.innerText.matchAll(/Question\s+(\d+)\s*:\s*([1-9]\d*)/gi))
+          .map((match) => [Number(match[1]), Number(match[2])])
+      );
+
+      const groups = new Map();
+      fixture.querySelectorAll('input[type="radio"][name^="quest"]').forEach((input) => {
+        const questionNumber = Number(input.name.replace(/\D+/g, ""));
+        if (!groups.has(questionNumber)) groups.set(questionNumber, []);
+        groups.get(questionNumber).push(Number(input.value));
+      });
+
+      const checks = [
+        ["answer key count", answers.size === 2],
+        ["question 1 answer", answers.get(1) === 2],
+        ["question 2 answer", answers.get(2) === 4],
+        ["native radio group count", groups.size === 2],
+        ["four options per native group", Array.from(groups.values()).every((values) => values.length === 4)],
+        ["dialogue prompt remains outside choices", normalize(fixture.innerText).includes('B "How about learning _______?"')]
+      ];
+
+      results.innerHTML = checks
+        .map(([label, passed]) => `${passed ? "PASS" : "FAIL"} ${label}`)
+        .join("\n");
+      results.className = checks.every(([, passed]) => passed) ? "pass" : "fail";
+    </script>
+  </body>
+</html>

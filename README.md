@@ -22,6 +22,15 @@ The extension is intentionally copyright-conscious: it does not bundle, copy, mi
 - Hides the original answer key by default to reduce spoilers.
 - Highlights correct choices in green, wrong selected choices in red, and unanswered questions neutrally.
 - Adds selected words or short phrases to Anki through local AnkiConnect, with a deck chooser.
+- Popup diagnostics for the current page:
+  - compatible page status
+  - question count
+  - answer key count
+  - native radio count
+  - active theme
+- Dark mode can be scoped to:
+  - helper UI only, leaving the original page and answer text unchanged
+  - whole page, applying a broader dark theme to the practice page
 - Stores only preferences and optional per-URL user notes. It does not store question text, choices, or answer keys.
 
 ## Local Installation
@@ -33,7 +42,7 @@ The extension is intentionally copyright-conscious: it does not bundle, copy, mi
 5. Open a compatible page, for example:
    `https://japanesetest4you.com/japanese-language-proficiency-test-jlpt-n4-grammar-exercise-3/#more-33`
 
-The `icons/` folder contains simple SVG placeholders. If you plan to package or publish the extension, replace them with production PNG icons and add an `icons` block to `manifest.json`.
+The `icons/` folder contains PNG extension icons plus SVG source placeholders.
 
 ## Manual Testing
 
@@ -47,6 +56,16 @@ The `icons/` folder contains simple SVG placeholders. If you plan to package or 
 8. Click **Reset** and confirm selections and highlights are cleared.
 9. Toggle **Show answer key** and confirm the original answer key appears.
 10. Test at least one more Japanesetest4you exercise page, ideally from another JLPT level or category.
+
+Because users manually choose which JLPT exercise page to open, the extension does not include a crawler or broad site scanner. Use the popup diagnostics on the current page to confirm the parser detected the expected question, answer key, and native radio counts.
+
+## Local Smoke Fixture
+
+Open `tests/parser-smoke.html` in a browser to run a synthetic fixture check for:
+
+- native `questN` radios
+- dialogue-style multiline prompts
+- answer key lines split by inline markup
 
 ## Anki Integration
 
