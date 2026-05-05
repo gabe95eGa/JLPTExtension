@@ -7,7 +7,9 @@
     hideAnswerKeyByDefault: true,
     theme: "system",
     toolbarCollapsed: false,
-    gptFeatureEnabled: false
+    gptFeatureEnabled: false,
+    ankiEnabled: true,
+    ankiLastDeck: ""
   };
 
   const state = {
@@ -18,7 +20,9 @@
     checked: false,
     prefs: { ...DEFAULT_PREFS },
     answerKeyHidden: true,
-    wrongQuestionNumbers: []
+    wrongQuestionNumbers: [],
+    ankiDecks: [],
+    ankiEndpoint: "http://127.0.0.1:8765"
   };
 
   const log = (...args) => {
@@ -110,21 +114,23 @@
     const startIndex = nodes.findIndex((node) => /Answer\s+Key\s*:/i.test(node.nodeValue));
     if (startIndex === -1) return null;
 
-    const stopPatterns = [
-      /^New words\s*:/i,
-      /^Grammar points/i,
-      /^If you find/i,
-      /^Featured posts/i,
-      /^Categories/i,
-      /^JLPT\s+N\d/i
-    ];
-    let endIndex = nodes.length - 1;
+    let endIndex = startIndex;
+    let seenAnswerLine = false;
+    let activeAnswerBlock = null;
     for (let i = startIndex + 1; i < nodes.length; i += 1) {
+      const block = nodes[i].parentElement && (nodes[i].parentElement.closest("p, li, td, blockquote") || nodes[i].parentElement);
       const text = normalize(nodes[i].nodeValue);
-      if (stopPatterns.some((pattern) => pattern.test(text))) {
-        endIndex = i - 1;
-        break;
+      const blockText = normalize(block && block.innerText);
+      const isAnswerLine = /^Question\s+\d+\s*:\s*[1-9]\d*/i.test(text) || /^Question\s+\d+\s*:\s*[1-9]\d*/i.test(blockText);
+      const isSameAnswerBlock = seenAnswerLine && block && block === activeAnswerBlock;
+
+      if (isAnswerLine || isSameAnswerBlock) {
+        endIndex = i;
+        seenAnswerLine = true;
+        activeAnswerBlock = block;
+        continue;
       }
+      if (seenAnswerLine) break;
     }
 
     const text = nodes.slice(startIndex, endIndex + 1).map((node) => node.nodeValue).join("\n");
@@ -172,7 +178,85 @@
     return "";
   };
 
+  const isBeforeAnswerKey = (node, answerKeySection) => {
+    if (!answerKeySection || !answerKeySection.startNode || !node) return true;
+    const position = node.compareDocumentPosition(answerKeySection.startNode);
+    return Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING);
+  };
+
+  const getNativeQuestionNumber = (input) => {
+    const nameMatch = String(input.name || "").match(/^quest(?:ion)?(\d+)$/i);
+    return nameMatch ? Number(nameMatch[1]) : null;
+  };
+
+  const getChoiceNodesAfterInput = (input) => {
+    const nodes = [];
+    let node = input.nextSibling;
+    while (node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.matches(`input[type="radio"], .${EXT_NS}`) || node.tagName === "BR") break;
+        const display = window.getComputedStyle(node).display;
+        if (display === "block" || display === "list-item" || display === "table-row") break;
+      }
+      nodes.push(node);
+      node = node.nextSibling;
+    }
+    return nodes;
+  };
+
+  const getChoiceTextAfterInput = (input) => normalize(getChoiceNodesAfterInput(input).map((node) => node.textContent || "").join(" "));
+
+  const parseNativeRadioQuestions = (root, answers, answerKeySection) => {
+    const inputs = Array.from(root.querySelectorAll('input[type="radio"][name^="quest"]'))
+      .filter((input) => isBeforeAnswerKey(input, answerKeySection))
+      .filter((input) => {
+        const questionNumber = getNativeQuestionNumber(input);
+        return questionNumber && answers.has(questionNumber) && /^\d+$/.test(input.value || "");
+      });
+
+    const groups = new Map();
+    inputs.forEach((input) => {
+      const questionNumber = getNativeQuestionNumber(input);
+      if (!groups.has(questionNumber)) groups.set(questionNumber, []);
+      groups.get(questionNumber).push(input);
+    });
+
+    if (!groups.size) return [];
+
+    const textNodes = textNodesUnder(root).filter((node) => isBeforeAnswerKey(node, answerKeySection));
+    return Array.from(groups.entries())
+      .sort(([left], [right]) => left - right)
+      .map(([number, questionInputs]) => {
+        const firstInput = questionInputs[0];
+        const questionNode = textNodes
+          .filter((node) => {
+            const text = normalize(node.nodeValue);
+            return new RegExp(`^${number}\\.\\s+`).test(text) && Boolean(node.compareDocumentPosition(firstInput) & Node.DOCUMENT_POSITION_FOLLOWING);
+          })
+          .pop();
+
+        return {
+          number,
+          text: questionNode ? normalize(questionNode.nodeValue) : getQuestionTextBeforeChoice(firstInput),
+          questionNode,
+          bodyNodes: [],
+          choices: questionInputs
+            .sort((left, right) => Number(left.value) - Number(right.value))
+            .map((input) => ({
+              number: Number(input.value),
+              text: getChoiceTextAfterInput(input),
+              input,
+              node: input
+            })),
+          grammarLinks: []
+        };
+      })
+      .filter((question) => question.choices.length >= answers.get(question.number));
+  };
+
   function parseQuestions(root, answers, answerKeySection) {
+    const nativeQuestions = parseNativeRadioQuestions(root, answers, answerKeySection);
+
     const nodes = textNodesUnder(root);
     const startIndex = answerKeySection ? nodes.indexOf(answerKeySection.startNode) : nodes.length;
     const usableNodes = startIndex > -1 ? nodes.slice(0, startIndex) : nodes;
@@ -216,18 +300,27 @@
       }));
     });
 
-    const grammarLinks = Array.from(root.querySelectorAll("a[href]"))
-      .filter((anchor) => !anchor.closest(`.${EXT_NS}`))
-      .filter((anchor) => /grammar|jlpt|japanese/i.test(anchor.href) || /Grammar points/i.test(normalize(anchor.parentElement && anchor.parentElement.textContent)))
-      .map((anchor) => ({ text: normalize(anchor.textContent), href: anchor.href }));
+    const grammarLinks = getGrammarLinks(root);
 
     questions.forEach((question) => {
       question.grammarLinks = grammarLinks;
       if (!question.text) question.text = getQuestionTextBeforeChoice(question.choices[0] && question.choices[0].node);
     });
 
-    return questions.filter((question) => answers.has(question.number) && question.choices.length >= answers.get(question.number));
+    const textQuestions = questions.filter((question) => answers.has(question.number) && question.choices.length >= answers.get(question.number));
+    const mergedQuestions = new Map(textQuestions.map((question) => [question.number, question]));
+    nativeQuestions.forEach((question) => {
+      question.grammarLinks = grammarLinks;
+      mergedQuestions.set(question.number, question);
+    });
+
+    return Array.from(mergedQuestions.values()).sort((left, right) => left.number - right.number);
   }
+
+  const getGrammarLinks = (root) => Array.from(root.querySelectorAll("a[href]"))
+    .filter((anchor) => !anchor.closest(`.${EXT_NS}`))
+    .filter((anchor) => /grammar|jlpt|japanese/i.test(anchor.href) || /Grammar points/i.test(normalize(anchor.parentElement && anchor.parentElement.textContent)))
+    .map((anchor) => ({ text: normalize(anchor.textContent), href: anchor.href }));
 
   const wrapAnswerKey = (answerKeySection) => {
     if (!answerKeySection || answerKeySection.wrapper) return answerKeySection && answerKeySection.wrapper;
@@ -239,9 +332,14 @@
     const wrapper = document.createElement("section");
     wrapper.className = `${EXT_NS} ${EXT_NS}__answer-key`;
     wrapper.setAttribute("aria-label", "Original answer key");
+    const placeholder = document.createElement("div");
+    placeholder.className = `${EXT_NS} ${EXT_NS}__answer-key-placeholder`;
+    placeholder.setAttribute("role", "status");
+    placeholder.textContent = "Answer key hidden by JLPT Helper";
 
     if (start.parentNode === end.parentNode) {
       const parent = start.parentNode;
+      parent.insertBefore(placeholder, start);
       parent.insertBefore(wrapper, start);
       let node = start;
       while (node) {
@@ -251,7 +349,8 @@
         node = next;
       }
     } else {
-      const startBlock = start.parentElement;
+      const startBlock = start.parentElement.closest("p, li, td, blockquote") || start.parentElement;
+      startBlock.parentNode.insertBefore(placeholder, startBlock);
       startBlock.parentNode.insertBefore(wrapper, startBlock);
       let node = startBlock;
       while (node) {
@@ -263,6 +362,8 @@
     }
 
     answerKeySection.wrapper = wrapper;
+    answerKeySection.placeholder = placeholder;
+    answerKeySection.hiddenElements = [];
     return wrapper;
   };
 
@@ -270,6 +371,12 @@
     const wrapper = state.answerKey && state.answerKey.wrapper;
     if (!wrapper) return;
     wrapper.classList.toggle(`${EXT_NS}__answer-key--hidden`, state.answerKeyHidden);
+    if (state.answerKey.placeholder) {
+      state.answerKey.placeholder.hidden = !state.answerKeyHidden;
+    }
+    (state.answerKey.hiddenElements || []).forEach((element) => {
+      element.classList.toggle(`${EXT_NS}__answer-key-line--hidden`, state.answerKeyHidden);
+    });
     const toggle = document.querySelector(`#${EXT_NS}-toggle-key`);
     if (toggle) {
       toggle.textContent = state.answerKeyHidden ? "Show answer key" : "Hide answer key";
@@ -317,20 +424,28 @@
         label.dataset.question = String(question.number);
         label.dataset.choice = String(choice.number);
 
-        const input = document.createElement("input");
-        input.type = "radio";
-        input.name = `${EXT_NS}-q-${question.number}`;
-        input.value = String(choice.number);
+        const input = choice.input || document.createElement("input");
+        if (!choice.input) {
+          input.type = "radio";
+          input.name = `${EXT_NS}-q-${question.number}`;
+          input.value = String(choice.number);
+          input.classList.add(`${EXT_NS}__synthetic-input`);
+        } else {
+          input.classList.add(`${EXT_NS}__native-input`);
+        }
         input.setAttribute("aria-label", `Question ${question.number}, answer ${choice.number}`);
 
         const badge = document.createElement("span");
         badge.className = `${EXT_NS}__choice-number`;
         badge.textContent = String(choice.number);
 
-        choice.node.parentNode.insertBefore(label, choice.node);
+        const choiceNodes = choice.input ? getChoiceNodesAfterInput(choice.input) : [choice.node];
+        const insertionParent = choice.input ? input.parentNode : choice.node.parentNode;
+        const insertionBefore = choice.input ? input : choice.node;
+        insertionParent.insertBefore(label, insertionBefore);
         label.appendChild(input);
         label.appendChild(badge);
-        label.appendChild(choice.node);
+        choiceNodes.forEach((node) => label.appendChild(node));
         choice.wrapper = label;
         choice.input = input;
 
@@ -475,6 +590,172 @@
     setTimeout(() => toast.remove(), 2200);
   };
 
+  const ankiRequest = async (action, params = {}) => {
+    if (typeof chrome === "undefined" || !chrome.runtime || !chrome.runtime.sendMessage) {
+      throw new Error("Extension runtime is unavailable.");
+    }
+
+    const response = await chrome.runtime.sendMessage({
+      type: "ankiRequest",
+      action,
+      params
+    });
+
+    if (!response || !response.ok) {
+      throw new Error(response && response.error ? response.error : "Could not connect to AnkiConnect.");
+    }
+    state.ankiEndpoint = response.endpoint || state.ankiEndpoint;
+    return response.result;
+  };
+
+  const loadAnkiDecks = async () => {
+    if (!state.prefs.ankiEnabled) return [];
+    state.ankiDecks = await ankiRequest("deckNames");
+    return state.ankiDecks;
+  };
+
+  const getSelectionText = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return "";
+    if (!state.root || !state.root.contains(selection.anchorNode) || !state.root.contains(selection.focusNode)) return "";
+    return normalize(selection.toString()).slice(0, 80);
+  };
+
+  const hideAnkiPopup = () => {
+    const popup = document.querySelector(`#${EXT_NS}-anki-popup`);
+    if (popup) popup.hidden = true;
+  };
+
+  const addSelectionToAnki = async (term, deckName) => {
+    if (!term || !deckName) return;
+
+    // Anki integration stores only the user-highlighted term plus a source link.
+    // It does not copy whole questions, choices, or answer keys into Anki.
+    await ankiRequest("addNote", {
+      note: {
+        deckName,
+        modelName: "Basic",
+        fields: {
+          Front: term,
+          Back: `Source: <a href="${escapeHtml(`${location.origin}${location.pathname}`)}">${escapeHtml(document.title || location.hostname)}</a>`
+        },
+        tags: ["jlpt-helper", "japanesetest4you"],
+        options: {
+          allowDuplicate: false,
+          duplicateScope: "deck"
+        }
+      }
+    });
+
+    state.prefs.ankiLastDeck = deckName;
+    await storageSet({ ankiLastDeck: deckName });
+    showToast(`Added "${term}" to Anki.`);
+    hideAnkiPopup();
+  };
+
+  const ensureAnkiPopup = () => {
+    let popup = document.querySelector(`#${EXT_NS}-anki-popup`);
+    if (popup) return popup;
+
+    popup = document.createElement("div");
+    popup.id = `${EXT_NS}-anki-popup`;
+    popup.className = `${EXT_NS} ${EXT_NS}__anki-popup`;
+    popup.hidden = true;
+    popup.innerHTML = `
+      <div class="${EXT_NS}__anki-term" id="${EXT_NS}-anki-term"></div>
+      <div class="${EXT_NS}__anki-controls">
+        <select id="${EXT_NS}-anki-deck" aria-label="Choose Anki deck"></select>
+        <button type="button" id="${EXT_NS}-anki-add">Add to Anki</button>
+      </div>
+      <div class="${EXT_NS}__anki-status" id="${EXT_NS}-anki-status" role="status"></div>
+    `;
+    document.body.appendChild(popup);
+
+    popup.addEventListener("mousedown", (event) => event.preventDefault());
+    popup.querySelector(`#${EXT_NS}-anki-add`).addEventListener("click", async () => {
+      const term = popup.dataset.term || "";
+      const deckName = popup.querySelector(`#${EXT_NS}-anki-deck`).value;
+      const status = popup.querySelector(`#${EXT_NS}-anki-status`);
+      try {
+        status.textContent = "Adding...";
+        await addSelectionToAnki(term, deckName);
+      } catch (error) {
+        status.textContent = "Open Anki with AnkiConnect enabled, then try again.";
+        console.warn("[JLPT Helper] Anki add failed:", error);
+      }
+    });
+
+    document.addEventListener("mousedown", (event) => {
+      if (!popup.hidden && !popup.contains(event.target)) hideAnkiPopup();
+    });
+
+    return popup;
+  };
+
+  const showAnkiPopupForSelection = async () => {
+    if (!state.prefs.ankiEnabled) return;
+    const term = getSelectionText();
+    if (!term || term.length > 80) {
+      hideAnkiPopup();
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      hideAnkiPopup();
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    if (!rect || (!rect.width && !rect.height)) return;
+
+    const popup = ensureAnkiPopup();
+    const deckSelect = popup.querySelector(`#${EXT_NS}-anki-deck`);
+    const status = popup.querySelector(`#${EXT_NS}-anki-status`);
+    popup.dataset.term = term;
+    popup.querySelector(`#${EXT_NS}-anki-term`).textContent = term;
+    status.textContent = "Loading decks...";
+    popup.hidden = false;
+    popup.style.left = `${Math.min(window.innerWidth - 280, Math.max(10, rect.left + window.scrollX))}px`;
+    popup.style.top = `${rect.bottom + window.scrollY + 8}px`;
+
+    try {
+      const decks = await loadAnkiDecks();
+      deckSelect.innerHTML = decks
+        .map((deck) => `<option value="${escapeHtml(deck)}">${escapeHtml(deck)}</option>`)
+        .join("");
+      const preferredDeck = state.prefs.ankiLastDeck && decks.includes(state.prefs.ankiLastDeck)
+        ? state.prefs.ankiLastDeck
+        : decks[0];
+      if (preferredDeck) deckSelect.value = preferredDeck;
+      status.textContent = decks.length ? "" : "No decks found.";
+    } catch (error) {
+      deckSelect.innerHTML = `<option value="">Anki unavailable</option>`;
+      status.textContent = "Open Anki with AnkiConnect enabled.";
+      console.warn("[JLPT Helper] Anki deck load failed:", error);
+    }
+  };
+
+  const initAnkiSelection = () => {
+    if (!state.prefs.ankiEnabled) return;
+    let timer = null;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(showAnkiPopupForSelection, 160);
+    };
+    document.addEventListener("mouseup", schedule);
+    document.addEventListener("keyup", (event) => {
+      if (event.key === "Escape") {
+        hideAnkiPopup();
+        return;
+      }
+      schedule();
+    });
+    document.addEventListener("selectionchange", () => {
+      if (!getSelectionText()) hideAnkiPopup();
+    });
+  };
+
   const injectToolbar = () => {
     if (document.querySelector(`#${EXT_NS}-toolbar`)) return;
     const toolbar = document.createElement("aside");
@@ -575,6 +856,7 @@
     injectQuizControls(state.questions);
     updateAnswerKeyVisibility();
     initNotes();
+    initAnkiSelection();
   };
 
   window.JT4YHelper = {

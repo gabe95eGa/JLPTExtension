@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "JLPT Page Practice Helper",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Adds an interactive correction layer to compatible Japanesetest4you JLPT practice pages.",
   "permissions": [
     "storage",
     "clipboardWrite"
   ],
   "host_permissions": [
-    "https://japanesetest4you.com/*"
+    "https://japanesetest4you.com/*",
+    "http://127.0.0.1:8765/*",
+    "http://localhost:8765/*"
   ],
   "content_scripts": [
     {
@@ -24,6 +26,9 @@
       "run_at": "document_idle"
     }
   ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "action": {
     "default_title": "JLPT Page Practice Helper",
     "default_popup": "src/popup.html"

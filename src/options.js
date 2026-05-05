@@ -2,7 +2,9 @@ const DEFAULT_PREFS = {
   hideAnswerKeyByDefault: true,
   theme: "system",
   toolbarCollapsed: false,
-  gptFeatureEnabled: false
+  gptFeatureEnabled: false,
+  ankiEnabled: true,
+  ankiLastDeck: ""
 };
 
 const form = document.getElementById("options-form");
@@ -12,6 +14,7 @@ chrome.storage.sync.get(DEFAULT_PREFS, (items) => {
   form.hideAnswerKeyByDefault.checked = Boolean(items.hideAnswerKeyByDefault);
   form.theme.value = items.theme || "system";
   form.gptFeatureEnabled.checked = Boolean(items.gptFeatureEnabled);
+  form.ankiEnabled.checked = Boolean(items.ankiEnabled);
 });
 
 form.addEventListener("submit", (event) => {
@@ -19,7 +22,8 @@ form.addEventListener("submit", (event) => {
   chrome.storage.sync.set({
     hideAnswerKeyByDefault: form.hideAnswerKeyByDefault.checked,
     theme: form.theme.value,
-    gptFeatureEnabled: form.gptFeatureEnabled.checked
+    gptFeatureEnabled: form.gptFeatureEnabled.checked,
+    ankiEnabled: form.ankiEnabled.checked
   }, () => {
     status.textContent = "Options saved.";
     setTimeout(() => {

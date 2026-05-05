@@ -9,7 +9,7 @@ The extension is intentionally copyright-conscious: it does not bundle, copy, mi
 - Runs only on `https://japanesetest4you.com/*`.
 - Detects compatible practice pages that include numbered questions and an `Answer Key` section.
 - Parses answer key lines such as `Question 1: 2 (...)`.
-- Adds one radio-style choice selector per answer choice.
+- Reuses the site's native `questN` radio inputs, such as `name="quest1"` and `value="1"`, as the source of truth for answer choices.
 - Uses accessible hidden radio inputs with clean numbered answer pills, avoiding duplicate visible controls.
 - Adds a floating toolbar with:
   - Check answers
@@ -21,6 +21,7 @@ The extension is intentionally copyright-conscious: it does not bundle, copy, mi
   - Copy mistake summary
 - Hides the original answer key by default to reduce spoilers.
 - Highlights correct choices in green, wrong selected choices in red, and unanswered questions neutrally.
+- Adds selected words or short phrases to Anki through local AnkiConnect, with a deck chooser.
 - Stores only preferences and optional per-URL user notes. It does not store question text, choices, or answer keys.
 
 ## Local Installation
@@ -47,6 +48,18 @@ The `icons/` folder contains simple SVG placeholders. If you plan to package or 
 9. Toggle **Show answer key** and confirm the original answer key appears.
 10. Test at least one more Japanesetest4you exercise page, ideally from another JLPT level or category.
 
+## Anki Integration
+
+The Anki feature uses the local [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on. It does not call any external service.
+
+1. Install Anki and the AnkiConnect add-on.
+2. Open Anki before using the extension.
+3. Highlight a word or short phrase on a compatible Japanesetest4you page.
+4. Choose the destination Anki deck from the popup.
+5. Click **Add to Anki**.
+
+Cards are created using Anki's `Basic` note type. The selected text is written to `Front`; `Back` contains only a source link to the current page without query strings or fragments. The extension does not save whole questions, answer choices, or answer keys into Anki.
+
 ## How The Parser Works
 
 The content script waits until the page is idle, then:
@@ -54,7 +67,7 @@ The content script waits until the page is idle, then:
 1. Searches likely article/content containers for both numbered questions and an `Answer Key` section.
 2. Locates the answer key text with `findAnswerKeySection`.
 3. Extracts correct choice numbers with `parseAnswerKey`.
-4. Reads visible text nodes before the answer key and groups each numbered question into a block. The final answer-like lines in that block become choices, while earlier continuation lines remain part of the question prompt.
+4. Preferentially detects native site radios like `input[name="quest1"][value="1"]` for answer choices. If a page lacks those controls, it falls back to the text-block parser.
 5. Injects radio controls beside the existing answer choice text with `injectQuizControls`.
 6. Compares user selections to the DOM-derived answer key only when the user clicks **Check answers**.
 
@@ -71,7 +84,7 @@ The implementation exposes these functions on `window.JT4YHelper` for console in
 
 This extension enhances the original website while the user is viewing it. It does not create a copied quiz database, mirror the content, or replace the website.
 
-The extension does not send page content to external servers. It does not store questions, answer choices, or answer keys in Chrome extension storage. Stored data is limited to user preferences, toolbar state, and optional user-written notes scoped to the current URL.
+The extension does not send page content to external servers. It does not store questions, answer choices, or answer keys in Chrome extension storage. Stored data is limited to user preferences, toolbar state, optional user-written notes scoped to the current URL, and the last selected Anki deck.
 
 The optional GPT helper is disabled by default. In this first version, the button only shows a warning. A future implementation should require explicit user approval and send only minimal context selected by the user.
 
